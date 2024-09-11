@@ -36,7 +36,7 @@ func main() {
 	r.GET("/user/list", listUsers)
 
 	fmt.Println("Server 4 is running on :8084")
-	if err := r.Run(":8084"); err != nil {
+	if err := r.Run("auth:8084"); err != nil {
 		log.Fatal(err)
 	}
 }
