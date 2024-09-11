@@ -14,7 +14,7 @@ FROM alpine:latest
 
 WORKDIR /app
 
-EXPOSE 8085
+EXPOSE 8084
 
 
 CMD ["./main"]
