@@ -19,7 +19,10 @@ services:
       timeout: 5s
 
   app:
+    container_name: auth
     build: .
+    ports:
+      - "8084:8084"
     depends_on:
       postgres4:
         condition: service_healthy
