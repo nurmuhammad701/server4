@@ -4,68 +4,101 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
+type User struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+var db *sql.DB
+
 func main() {
-	// Server1 ga ulanish
-	db1, err := sql.Open("postgres", "host=your_local_ip port=5432 user=postgres password=your_password dbname=server1_db sslmode=disable")
+	var err error
+	db, err = sql.Open("postgres", "host=localhost port=5432 user=postgres password=your_password dbname=server4_db sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db1.Close()
+	defer db.Close()
 
-	// Server2 ga ulanish
-	db2, err := sql.Open("postgres", "host=your_local_ip port=5433 user=postgres password=your_password dbname=server2_db sslmode=disable")
-	if err != nil {
+	if err = db.Ping(); err != nil {
 		log.Fatal(err)
 	}
-	defer db2.Close()
 
-	// Server3 ga ulanish
-	db3, err := sql.Open("postgres", "host=your_local_ip port=5434 user=postgres password=your_password dbname=server3_db sslmode=disable")
-	if err != nil {
+	r := gin.Default()
+
+	r.POST("/user/register", registerUser)
+	r.GET("/user/list", listUsers)
+
+	fmt.Println("Server 4 is running on :8084")
+	if err := r.Run(":8084"); err != nil {
 		log.Fatal(err)
 	}
-	defer db3.Close()
+}
 
-	// Server4 ga ulanish (masofaviy)
-	db4, err := sql.Open("postgres", "host=localhost port=5432 user=postgres password=your_password dbname=server4_db sslmode=disable")
+func registerUser(c *gin.Context) {
+	var user User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	stmt, err := db.Prepare("INSERT INTO users(username, email) VALUES($1, $2) RETURNING id")
 	if err != nil {
-		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Prepare error: %v", err)
+		return
 	}
-	defer db4.Close()
+	defer stmt.Close()
 
-	// Barcha serverlardan ma'lumotlarni o'qish
-	servers := []struct {
-		name string
-		db   *sql.DB
-	}{
-		{"Server1", db1},
-		{"Server2", db2},
-		{"Server3", db3},
-		{"Server4", db4},
+	err = stmt.QueryRow(user.Username, user.Email).Scan(&user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("QueryRow error: %v", err)
+		return
 	}
 
-	for _, server := range servers {
-		fmt.Printf("Users from %s:\n", server.name)
-		rows, err := server.db.Query("SELECT * FROM users")
-		if err != nil {
-			log.Printf("Error querying %s: %v", server.name, err)
-			continue
+	c.JSON(http.StatusCreated, user)
+}
+
+func listUsers(c *gin.Context) {
+	rows, err := db.Query(`
+		SELECT id, username, email FROM users
+		UNION ALL
+		SELECT id, username, email FROM users_server1
+		UNION ALL
+		SELECT id, username, email FROM users_server2
+		UNION ALL
+		SELECT id, username, email FROM users_server3
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Query error: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Printf("Scan error: %v", err)
+			return
 		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var id int
-			var username, email string
-			if err := rows.Scan(&id, &username, &email); err != nil {
-				log.Printf("Error scanning row from %s: %v", server.name, err)
-				continue
-			}
-			fmt.Printf("ID: %d, Username: %s, Email: %s\n", id, username, email)
-		}
-		fmt.Println()
+		users = append(users, user)
 	}
+
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Rows error: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
 }
