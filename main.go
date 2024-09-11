@@ -20,7 +20,7 @@ var db *sql.DB
 
 func main() {
 	var err error
-	db, err = sql.Open("postgres", "host=localhost port=5432 user=postgres password=your_password dbname=server4_db sslmode=disable")
+	db, err = sql.Open("postgres", "host=postgres4 port=5432 user=postgres password=your_password dbname=server4_db sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func main() {
 	r.GET("/user/list", listUsers)
 
 	fmt.Println("Server 4 is running on :8084")
-	if err := r.Run("auth:8084"); err != nil {
+	if err := r.Run(":8084"); err != nil {
 		log.Fatal(err)
 	}
 }
