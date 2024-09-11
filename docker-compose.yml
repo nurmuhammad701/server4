@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  postgres4:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: server4_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-scripts:/docker-entrypoint-initdb.d
+      - postgres4_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - postgres4
+
+volumes:
+  postgres4_data:
